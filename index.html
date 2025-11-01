@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NPM Package Updater</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#377DFF',
+            'primary-dark': '#2c6bd6',
+            'success': '#10B981',
+            'warning': '#F59E0B',
+            'error': '#EF4444',
+          },
+          animation: {
+            'spin-slow': 'spin 2s linear infinite',
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 6s ease-in-out infinite',
+            'bounce-slow': 'bounce 3s infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-10px)' },
+            }
+          },
+          fontFamily: {
+            'sans': ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    .gradient-text {
+      background: linear-gradient(90deg, #377DFF 0%, #2c6bd6 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .code-editor {
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      border: 1px solid rgba(55, 125, 255, 0.1);
+    }
+    .smooth-transition {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(55, 125, 255, 0.2);
+    }
+    .tooltip {
+      position: relative;
+    }
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: 120px;
+      background-color: #555;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    .tab-button {
+      transition: all 0.2s ease;
+    }
+    .tab-button.active {
+      background-color: #377DFF;
+      color: white;
+    }
+    .code-textarea {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      resize: none;
+    }
+    .file-input-wrapper input[type=file] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    .output-box {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    }
+    .copy-success {
+      animation: fadeOut 2s ease-in-out;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+    .animate-shake {
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    }
+  </style>
+</head>
+<body class="bg-white min-h-screen font-sans antialiased">
+  <div class="fixed inset-0 overflow-hidden -z-10">
+    <div class="absolute top-20 left-10 w-32 h-32 rounded-full bg-blue-50 opacity-70 animate-float"></div>
+    <div class="absolute bottom-20 right-10 w-40 h-40 rounded-full bg-blue-50 opacity-70 animate-float" style="animation-delay: 1s;"></div>
+    <div class="absolute top-1/3 right-1/4 w-24 h-24 rounded-full bg-blue-50 opacity-70 animate-float" style="animation-delay: 2s;"></div>
+  </div>
+
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <header class="mb-12 text-center">
+      <div class="inline-block mb-4 animate-bounce-slow">
+        <div class="bg-primary/10 p-4 rounded-2xl">
+          <i class="fas fa-box-open text-primary text-4xl"></i>
+        </div>
+      </div>
+      <h1 class="text-5xl font-bold gradient-text mb-3">NPM Package Updater</h1>
+      <p class="text-gray-600 max-w-2xl mx-auto">Update your package.json dependencies to their latest versions with a single click</p>
+    </header>
+
+    <div class="bg-white code-editor p-6 mb-8">
+      <div class="flex border-b border-gray-200 mb-6">
+        <button id="uploadTab" class="tab-button flex-1 py-3 text-center font-medium rounded-t-lg active">
+          <i class="fas fa-file-upload mr-2"></i>Upload File
+        </button>
+        <button id="pasteTab" class="tab-button flex-1 py-3 text-center font-medium rounded-t-lg text-gray-600 bg-gray-100">
+          <i class="fas fa-code mr-2"></i>Paste Code
+        </button>
+      </div>
+
+      <div id="uploadContent" class="tab-content">
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Upload package.json</label>
+          <div class="file-input-wrapper relative">
+            <input id="fileInput" type="file" accept=".json" />
+            <div id="fileInputLabel" class="flex flex-col items-center justify-center gap-3 p-8 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer transition-all duration-300 hover:border-primary hover:text-primary hover:bg-blue-50">
+              
+              <div class="icon-container w-16 h-16 bg-blue-100 rounded-full text-primary flex items-center justify-center">
+                <i class="fas fa-cloud-upload-alt text-2xl"></i>
+              </div>
+
+              <div class="text-center">
+                <span id="fileInputText" class="font-medium">Choose package.json file</span>
+                <p class="text-xs mt-1 text-gray-400">or drag and drop it here</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pasteContent" class="tab-content hidden">
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Paste package.json content</label>
+          <textarea id="codeInput" class="code-textarea w-full h-64 p-4 border border-gray-300 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 smooth-transition" placeholder='Paste your package.json content here...'></textarea>
+        </div>
+      </div>
+
+      <div class="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+        <label class="flex items-start space-x-3">
+          <input id="useCaretPrefix" type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary mt-1" checked>
+          <div>
+            <span class="text-sm font-medium text-gray-700">Add caret (^) prefix to versions</span>
+            <p class="text-xs text-gray-500 mt-1">When checked, versions will be prefixed with ^ (e.g., ^1.0.0). Uncheck to keep exact versions.</p>
+          </div>
+        </label>
+      </div>
+
+      <button id="updateBtn" class="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 smooth-transition btn-hover">
+        <span id="updateText"><i class="fas fa-sync-alt mr-2"></i> Update Dependencies</span>
+        <span id="updateSpinner" class="hidden ml-2">
+          <i class="fas fa-circle-notch fa-spin"></i>
+        </span>
+      </button>
+
+      <div id="actionButtons" class="hidden mt-4 grid grid-cols-2 gap-3">
+        <button id="downloadBtn" class="bg-success hover:bg-green-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 smooth-transition btn-hover">
+          <i class="fas fa-download mr-2"></i>
+          Download
+        </button>
+        <button id="copyBtn" class="bg-primary hover:bg-primary-dark text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 smooth-transition btn-hover">
+          <i class="fas fa-copy mr-2"></i>
+          Copy to Clipboard
+        </button>
+      </div>
+
+      <div id="copySuccess" class="hidden mt-3 p-3 bg-green-100 border border-green-200 text-green-700 rounded-lg text-center">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span>Package.json copied to clipboard successfully!</span>
+      </div>
+
+      <div id="loading" class="hidden mt-6 p-4 bg-blue-50 rounded-xl text-center border border-blue-100">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-primary mb-3">
+          <i class="fas fa-spinner fa-spin text-xl"></i>
+        </div>
+        <p class="text-blue-700 font-medium">Fetching latest versions...</p>
+        <p class="text-blue-600 text-sm mt-1">This may take a moment depending on the number of dependencies</p>
+      </div>
+    </div>
+
+    <div class="bg-white code-editor p-6 mb-16">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-clipboard-list text-primary"></i>
+          Update Results
+        </h2>
+        <div id="resultStats" class="hidden text-sm text-gray-500">
+          <span id="updatedCount" class="font-medium text-success">0 updated</span>
+          <span class="mx-2">•</span>
+          <span id="failedCount" class="font-medium text-error">0 failed</span>
+        </div>
+      </div>
+      <div id="output" class="output-box p-4 w-full text-sm overflow-auto h-64 bg-gray-50 border border-gray-200 rounded-xl smooth-transition space-y-1"></div>
+    </div>
+
+    <div class="mb-16">
+      <h2 class="text-3xl font-bold text-center text-gray-800 mb-2">Why Use Our Package Updater?</h2>
+      <p class="text-gray-600 text-center max-w-2xl mx-auto mb-12">Streamline your development workflow with these powerful features</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md smooth-transition">
+          <div class="bg-primary/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+            <i class="fas fa-bolt text-primary text-xl"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-2">One-Click Updates</h3>
+          <p class="text-gray-600">Update all your dependencies to their latest versions with a single click, saving you time and effort.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md smooth-transition">
+          <div class="bg-primary/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+            <i class="fas fa-shield-alt text-primary text-xl"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-2">Version Control</h3>
+          <p class="text-gray-600">Choose between exact versions or caret prefixes for flexible version management in your projects.</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md smooth-transition">
+          <div class="bg-primary/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+            <i class="fas fa-cloud-upload-alt text-primary text-xl"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-800 mb-2">Multiple Input Methods</h3>
+          <p class="text-gray-600">Upload your package.json file or paste its content directly - we support both workflows.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-16 bg-blue-50 rounded-2xl p-8">
+      <h2 class="text-3xl font-bold text-center text-gray-800 mb-12">How It Works</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="text-center">
+          <div class="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Provide Your Package.json</h3>
+          <p class="text-gray-600">Upload your package.json file or paste its content into the editor.</p>
+        </div>
+
+        <div class="text-center">
+          <div class="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">2</div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Click Update</h3>
+          <p class="text-gray-600">Our system will fetch the latest versions of all your dependencies from the npm registry.</p>
+        </div>
+
+        <div class="text-center">
+          <div class="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">3</div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">Get Updated Package.json</h3>
+          <p class="text-gray-600">Download or copy your updated package.json with all dependencies at their latest versions.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer class="text-center pt-8 border-t border-gray-100">
+      <p class="text-gray-500 text-sm mb-2">© 2025 NPM Package Updater. All rights reserved.</p>
+      <p class="text-gray-400 text-xs">v1.0.0</p>
+    </footer>
+  </div>
+
+  <script>
+    // DOM Elements
+    const uploadTab = document.getElementById("uploadTab");
+    const pasteTab = document.getElementById("pasteTab");
+    const uploadContent = document.getElementById("uploadContent");
+    const pasteContent = document.getElementById("pasteContent");
+    const updateBtn = document.getElementById("updateBtn");
+    const updateText = document.getElementById("updateText");
+    const updateSpinner = document.getElementById("updateSpinner");
+    const actionButtons = document.getElementById("actionButtons");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const copySuccess = document.getElementById("copySuccess");
+    const fileInput = document.getElementById("fileInput");
+    const fileInputLabel = document.getElementById("fileInputLabel");
+    const fileInputText = document.getElementById("fileInputText");
+    const codeInput = document.getElementById("codeInput");
+    const useCaretPrefix = document.getElementById("useCaretPrefix");
+    const output = document.getElementById("output");
+    const loading = document.getElementById("loading");
+    const resultStats = document.getElementById("resultStats");
+    const updatedCount = document.getElementById("updatedCount");
+    const failedCount = document.getElementById("failedCount");
+
+    let updatedPackageJson = null;
+
+    // Tab Switching
+    uploadTab.addEventListener("click", () => {
+      uploadTab.classList.add("active", "text-white");
+      uploadTab.classList.remove("text-gray-600", "bg-gray-100");
+      pasteTab.classList.remove("active", "text-white");
+      pasteTab.classList.add("text-gray-600", "bg-gray-100");
+      uploadContent.classList.remove("hidden");
+      pasteContent.classList.add("hidden");
+    });
+
+    pasteTab.addEventListener("click", () => {
+      pasteTab.classList.add("active", "text-white");
+      pasteTab.classList.remove("text-gray-600", "bg-gray-100");
+      uploadTab.classList.remove("active", "text-white");
+      uploadTab.classList.add("text-gray-600", "bg-gray-100");
+      pasteContent.classList.remove("hidden");
+      uploadContent.classList.add("hidden");
+    });
+
+    // File Input Styling
+    fileInput.addEventListener("change", function() {
+      if (this.files && this.files[0]) {
+        fileInputLabel.classList.add("border-primary", "text-primary", "bg-blue-50");
+        fileInputText.textContent = this.files[0].name;
+      } else {
+        fileInputLabel.classList.remove("border-primary", "text-primary", "bg-blue-50");
+        fileInputText.textContent = "Choose package.json file";
+      }
+    });
+
+    // Download Button Handler
+    downloadBtn.addEventListener("click", () => {
+      if (!updatedPackageJson) return;
+      
+      const blob = new Blob([JSON.stringify(updatedPackageJson, null, 2)], { 
+        type: "application/json" 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "package.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+
+    // Copy Button Handler
+    copyBtn.addEventListener("click", async () => {
+      if (!updatedPackageJson) return;
+      
+      try {
+        const packageJsonString = JSON.stringify(updatedPackageJson, null, 2);
+        await navigator.clipboard.writeText(packageJsonString);
+        
+        // Show success message
+        copySuccess.classList.remove("hidden");
+        copySuccess.classList.add("copy-success");
+        
+        // Hide success message after animation
+        setTimeout(() => {
+          copySuccess.classList.remove("copy-success");
+          copySuccess.classList.add("hidden");
+        }, 2000);
+      } catch (err) {
+        alert("Failed to copy to clipboard. Please try again.");
+        console.error("Copy failed:", err);
+      }
+    });
+
+    // Update Button Handler
+    updateBtn.addEventListener("click", async () => {
+      let pkgText = "";
+      
+      // Determine input source
+      if (!uploadContent.classList.contains("hidden")) {
+        // File upload mode
+        const file = fileInput.files[0];
+        if (!file) {
+          showStatus("Please upload your package.json first.", "error");
+          animateShake(fileInputLabel);
+          return;
+        }
+        pkgText = await file.text();
+      } else {
+        // Code paste mode
+        pkgText = codeInput.value.trim();
+        if (!pkgText) {
+          showStatus("Please paste your package.json content first.", "error");
+          animateShake(codeInput);
+          return;
+        }
+      }
+
+      // Parse JSON
+      let pkg;
+      try {
+        pkg = JSON.parse(pkgText);
+      } catch (e) {
+        showStatus("Invalid JSON. Please check your package.json content.", "error");
+        animateShake(codeInput);
+        return;
+      }
+
+      // Validate package.json structure
+      if (!pkg.dependencies && !pkg.devDependencies) {
+        showStatus("No dependencies found in package.json.", "error");
+        animateShake(codeInput);
+        return;
+      }
+
+      // Process dependencies
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      const updated = {};
+      let successCount = 0;
+      let failCount = 0;
+
+      // UI Loading state
+      updateText.innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Processing...';
+      updateSpinner.classList.remove("hidden");
+      updateBtn.disabled = true;
+      updateBtn.classList.add("cursor-not-allowed", "opacity-90");
+      loading.classList.remove("hidden");
+      actionButtons.classList.add("hidden");
+      copySuccess.classList.add("hidden");
+      resultStats.classList.add("hidden");
+      
+      output.innerHTML = `<div class="flex items-center gap-2 text-blue-700"><i class="fas fa-hourglass-start w-4 text-center"></i> Checking npm registry for latest versions...</div>`;
+
+      // Process each dependency
+      for (const [name, version] of Object.entries(deps)) {
+        try {
+          const res = await fetch(`httpshttps://registry.npmjs.org/${name}/latest`);
+          if (!res.ok) throw new Error("Failed to fetch");
+          
+          const data = await res.json();
+          const newVersion = useCaretPrefix.checked ? `^${data.version}` : data.version;
+          updated[name] = newVersion;
+          output.innerHTML += `<div class="flex items-center gap-2 text-success"><i class="fas fa-check-circle w-4 text-center"></i> ${name}: ${version} → ${newVersion}</div>`;
+          successCount++;
+        } catch {
+          output.innerHTML += `<div class="flex items-center gap-2 text-error"><i class="fas fa-times-circle w-4 text-center"></i> ${name}: Failed to fetch latest version</div>`;
+          updated[name] = version;
+          failCount++;
+        }
+      }
+
+      // Update package.json with new versions
+      const updatedPkg = JSON.parse(JSON.stringify(pkg)); // Deep clone
+      
+      if (updatedPkg.dependencies) {
+        for (const key in updatedPkg.dependencies) {
+          updatedPkg.dependencies[key] = updated[key] || updatedPkg.dependencies[key];
+        }
+      }
+      if (updatedPkg.devDependencies) {
+        for (const key in updatedPkg.devDependencies) {
+          updatedPkg.devDependencies[key] = updated[key] || updatedPkg.devDependencies[key];
+        }
+      }
+
+      // Store the updated package.json for download/copy
+      updatedPackageJson = updatedPkg;
+
+      // Update UI with results
+      updateText.innerHTML = '<i class="fas fa-sync-alt mr-2"></i> Update Dependencies';
+      updateSpinner.classList.add("hidden");
+      updateBtn.disabled = false;
+      updateBtn.classList.remove("cursor-not-allowed", "opacity-90");
+      loading.classList.add("hidden");
+      actionButtons.classList.remove("hidden");
+      resultStats.classList.remove("hidden");
+      updatedCount.textContent = `${successCount} updated`;
+      failedCount.textContent = `${failCount} failed`;
+      
+      output.innerHTML += `<br><div class="flex items-center gap-2 text-success font-medium"><i class="fas fa-check-circle w-4 text-center"></i> Processing complete!</div>`;
+      output.innerHTML += `<div class="flex items-center gap-2 text-gray-600"><i class="fas fa-chart-bar w-4 text-center"></i> ${successCount} packages updated, ${failCount} packages failed to update.</div>`;
+      output.innerHTML += `<div class="flex items-center gap-2 text-gray-600"><i class="fas fa-save w-4 text-center"></i> Use the buttons above to download or copy your updated package.json.</div>`;
+    });
+
+    // Animation functions
+    function animateShake(element) {
+      element.classList.add('animate-shake');
+      setTimeout(() => {
+        element.classList.remove('animate-shake');
+      }, 500);
+    }
+
+    function showStatus(message, type) {
+      // Create a temporary status message
+      const statusEl = document.createElement('div');
+      statusEl.className = 'fixed top-4 right-4 p-4 rounded-lg text-white z-50 smooth-transition';
+      
+      if (type === 'error') {
+        statusEl.classList.add('bg-red-500');
+      } else {
+        statusEl.classList.add('bg-blue-500');
+      }
+      
+      statusEl.textContent = message;
+      document.body.appendChild(statusEl);
+      
+      // Remove after 3 seconds
+      setTimeout(() => {
+        statusEl.remove();
+      }, 3000);
+    }
+
+We 
+    // Initialize animations
+    document.addEventListener('DOMContentLoaded', () => {
+      // Add animation to header
+      const header = document.querySelector('header h1');
+      setTimeout(() => {
+        header.classList.add('opacity-0', 'translate-y-4');
+        setTimeout(() => {
+          header.classList.remove('opacity-0', 'translate-y-4');
+        }, 100);
+      }, 100);
+
+      // Add animation to features
+      const features = document.querySelectorAll('.grid > div');
+      features.forEach((feature, index) => {
+        setTimeout(() => {
+          feature.classList.add('opacity-0', 'translate-y-8');
+          setTimeout(() => {
+            feature.classList.remove('opacity-0', 'translate-y-8');
+          }, 100 + index * 100);
+        }, 300);
+      });
+    });
+  </script>
+</body>
+</html>
