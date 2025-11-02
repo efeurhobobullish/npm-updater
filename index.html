@@ -153,7 +153,7 @@
           <div class="file-input-wrapper relative">
             <input id="fileInput" type="file" accept=".json" />
             <div id="fileInputLabel" class="flex flex-col items-center justify-center gap-3 p-8 bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer transition-all duration-300 hover:border-primary hover:text-primary hover:bg-blue-50">
-              
+
               <div class="icon-container w-16 h-16 bg-blue-100 rounded-full text-primary flex items-center justify-center">
                 <i class="fas fa-cloud-upload-alt text-2xl"></i>
               </div>
@@ -351,7 +351,7 @@
     // Download Button Handler
     downloadBtn.addEventListener("click", () => {
       if (!updatedPackageJson) return;
-      
+
       const blob = new Blob([JSON.stringify(updatedPackageJson, null, 2)], { 
         type: "application/json" 
       });
@@ -368,15 +368,15 @@
     // Copy Button Handler
     copyBtn.addEventListener("click", async () => {
       if (!updatedPackageJson) return;
-      
+
       try {
         const packageJsonString = JSON.stringify(updatedPackageJson, null, 2);
         await navigator.clipboard.writeText(packageJsonString);
-        
+
         // Show success message
         copySuccess.classList.remove("hidden");
         copySuccess.classList.add("copy-success");
-        
+
         // Hide success message after animation
         setTimeout(() => {
           copySuccess.classList.remove("copy-success");
@@ -391,7 +391,7 @@
     // Update Button Handler
     updateBtn.addEventListener("click", async () => {
       let pkgText = "";
-      
+
       // Determine input source
       if (!uploadContent.classList.contains("hidden")) {
         // File upload mode
@@ -444,15 +444,15 @@
       actionButtons.classList.add("hidden");
       copySuccess.classList.add("hidden");
       resultStats.classList.add("hidden");
-      
+
       output.innerHTML = `<div class="flex items-center gap-2 text-blue-700"><i class="fas fa-hourglass-start w-4 text-center"></i> Checking npm registry for latest versions...</div>`;
 
       // Process each dependency
       for (const [name, version] of Object.entries(deps)) {
         try {
-          const res = await fetch(`httpshttps://registry.npmjs.org/${name}/latest`);
+          const res = await fetch(`https://registry.npmjs.org/${name}/latest`);
           if (!res.ok) throw new Error("Failed to fetch");
-          
+
           const data = await res.json();
           const newVersion = useCaretPrefix.checked ? `^${data.version}` : data.version;
           updated[name] = newVersion;
@@ -467,7 +467,7 @@
 
       // Update package.json with new versions
       const updatedPkg = JSON.parse(JSON.stringify(pkg)); // Deep clone
-      
+
       if (updatedPkg.dependencies) {
         for (const key in updatedPkg.dependencies) {
           updatedPkg.dependencies[key] = updated[key] || updatedPkg.dependencies[key];
@@ -492,7 +492,7 @@
       resultStats.classList.remove("hidden");
       updatedCount.textContent = `${successCount} updated`;
       failedCount.textContent = `${failCount} failed`;
-      
+
       output.innerHTML += `<br><div class="flex items-center gap-2 text-success font-medium"><i class="fas fa-check-circle w-4 text-center"></i> Processing complete!</div>`;
       output.innerHTML += `<div class="flex items-center gap-2 text-gray-600"><i class="fas fa-chart-bar w-4 text-center"></i> ${successCount} packages updated, ${failCount} packages failed to update.</div>`;
       output.innerHTML += `<div class="flex items-center gap-2 text-gray-600"><i class="fas fa-save w-4 text-center"></i> Use the buttons above to download or copy your updated package.json.</div>`;
@@ -510,16 +510,16 @@
       // Create a temporary status message
       const statusEl = document.createElement('div');
       statusEl.className = 'fixed top-4 right-4 p-4 rounded-lg text-white z-50 smooth-transition';
-      
+
       if (type === 'error') {
         statusEl.classList.add('bg-red-500');
       } else {
         statusEl.classList.add('bg-blue-500');
       }
-      
+
       statusEl.textContent = message;
       document.body.appendChild(statusEl);
-      
+
       // Remove after 3 seconds
       setTimeout(() => {
         statusEl.remove();
